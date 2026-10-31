@@ -31,9 +31,8 @@
  function renderEma(code,date,targetId="emaChart"){
   const el=e(targetId),allHist=(M.history[code]||[]).filter(a=>a[0]<=date);const count=Number(el.dataset.bars||40);const hist=allHist.slice(-count);
   if(!hist.length){el.textContent='일봉 자료 없음';return;}
-  const closes=hist.map(a=>Number(a[1]));
-  const ema=period=>{let avg=null;const k=2/(period+1);return closes.map((v,i)=>{if(i<period-1)return null;if(i===period-1){avg=closes.slice(0,period).reduce((a,b)=>a+b,0)/period;return avg;}avg=v*k+avg*(1-k);return avg;});};
-  const lines=[ema(5),ema(10),ema(20)];
+  // EMA values are calculated over full dated history in Python; zoom changes display only.
+  const lines=[7,8,9].map(index=>hist.map(bar=>bar[index] ?? null));
   const complete=hist.filter(a=>[a[2],a[3],a[4]].every(v=>v!==null&&v!==undefined&&Number.isFinite(Number(v))));
   if(!complete.length){el.textContent='OHLC 자료 없음 — 캔들을 표시할 수 없습니다.';return;}
   const all=[...hist.flatMap(a=>[Number(a[1]),Number(a[2]),Number(a[3]),Number(a[4])]).filter(Number.isFinite),...lines.flat().filter(v=>v!==null&&Number.isFinite(v))];
