@@ -29,7 +29,7 @@
  return '<button type="button" class="market-card" data-idx="'+i+'"><strong>'+(i+1)+'. '+escapeHtml(r['종목명'])+'</strong><small>'+escapeHtml(r['종목코드'])+(market==='sm'&&(r['유형']||r['_group'])?' · '+escapeHtml(r['유형']||r['_group']):'')+'</small><div class="market-card-values">'+cells.map(([k,v])=>'<span>'+escapeHtml(k)+'<b>'+escapeHtml(nfmt(v))+'</b></span>').join('')+'</div></button>';}).join('');
  cards.querySelectorAll('.market-card').forEach(b=>b.addEventListener('click',()=>{const r=rows[Number(b.dataset.idx)];const d=e('marketDrawer'),back=e('marketBackdrop');d.innerHTML='<div class="drawerhead"><h2>'+escapeHtml(r['종목명'])+' <small>'+escapeHtml(r['종목코드'])+'</small></h2><button class="btn" id="marketClose">✕ 닫기</button></div><div class="mini"><h4>일봉 캔들(시가·고가·저가·종가) + EMA 5·10·20</h4><div id="emaChart"></div></div>'+Object.entries(r).filter(([k,v])=>!k.startsWith('_')&&v!==''&&v!==null&&v!==undefined&&v!=='미확인').map(([k,v])=>'<div class="detailrow"><label>'+escapeHtml(k)+'</label><span>'+escapeHtml(nfmt(v))+'</span></div>').join('');back.classList.add('visible');e('marketClose').onclick=()=>back.classList.remove('visible');renderEma(r['종목코드'],date);}));}
  function renderEma(code,date,targetId="emaChart"){
-  const el=e(targetId),hist=(M.history[code]||[]).filter(a=>a[0]<=date);
+  const el=e(targetId),allHist=(M.history[code]||[]).filter(a=>a[0]<=date);const count=Number(el.dataset.bars||40);const hist=allHist.slice(-count);
   if(!hist.length){el.textContent='일봉 자료 없음';return;}
   const closes=hist.map(a=>Number(a[1]));
   const ema=period=>{let avg=null;const k=2/(period+1);return closes.map((v,i)=>{if(i<period-1)return null;if(i===period-1){avg=closes.slice(0,period).reduce((a,b)=>a+b,0)/period;return avg;}avg=v*k+avg*(1-k);return avg;});};
@@ -40,9 +40,18 @@
   const min=Math.min(...all),max=Math.max(...all),w=640,h=250,left=35,right=14,top=14,bottom=28;
   const yp=v=>top+(max-v)/((max-min)||1)*(h-top-bottom),xp=i=>left+i*(w-left-right)/Math.max(1,hist.length-1);
   const cw=Math.max(2,Math.min(10,(w-left-right)/Math.max(1,hist.length)*.6));
-  let bars='';hist.forEach((a,i)=>{const [d,close,open,high,low]=a;if([close,open,high,low].some(v=>v===null||v===undefined||!Number.isFinite(Number(v))))return;const x=xp(i),up=Number(close)>=Number(open),color=up?'#d64b4b':'#2784c5';const y1=yp(Math.max(open,close)),y2=yp(Math.min(open,close));bars+='<line x1="'+x+'" y1="'+yp(high)+'" x2="'+x+'" y2="'+yp(low)+'" stroke="'+color+'" stroke-width="1.5"/><rect x="'+(x-cw/2)+'" y="'+y1+'" width="'+cw+'" height="'+Math.max(1,y2-y1)+'" fill="'+color+'"/>';});
+  let bars='';let hits='';hist.forEach((a,i)=>{const [d,close,open,high,low]=a;if([close,open,high,low].some(v=>v===null||v===undefined||!Number.isFinite(Number(v))))return;const x=xp(i),up=Number(close)>=Number(open),color=up?'#d64b4b':'#2784c5';const y1=yp(Math.max(open,close)),y2=yp(Math.min(open,close));bars+='<line x1="'+x+'" y1="'+yp(high)+'" x2="'+x+'" y2="'+yp(low)+'" stroke="'+color+'" stroke-width="1.5"/><rect x="'+(x-cw/2)+'" y="'+y1+'" width="'+cw+'" height="'+Math.max(1,y2-y1)+'" fill="'+color+'"/>';hits+='<rect class="candle-hit" data-day="'+escapeHtml(d)+'" data-close="'+escapeHtml(nfmt(close))+'" data-volume="'+escapeHtml(a[5] == null?'미확인':nfmt(a[5]))+'" data-money="'+escapeHtml(a[6] == null?'미확인':nfmt(a[6]))+'" x="'+(x-Math.max(5,cw))+'" y="0" width="'+Math.max(10,cw*2)+'" height="250" fill="transparent"/>';});
   const colors=['#d98b2d','#2e9b7a','#8355b8'];const paths=lines.map((arr,j)=>{let begun=false;const points=arr.map((v,i)=>{if(v===null||!Number.isFinite(v)){begun=false;return '';}const p=(begun?'L':'M')+xp(i).toFixed(1)+','+yp(v).toFixed(1);begun=true;return p;}).join(' ');return '<path d="'+points+'" fill="none" stroke="'+colors[j]+'" stroke-width="2"/>';});
-  el.innerHTML='<svg viewBox="0 0 640 250" style="width:100%;height:250px" role="img" aria-label="가격 캔들 차트 및 EMA 5 10 20일">'+bars+paths.join('')+'</svg><div class="ema-legend"><span style="color:#d64b4b">■ 상승봉</span> <span style="color:#2784c5">■ 하락봉</span> '+['EMA5','EMA10','EMA20'].map((x,i)=>'<span style="color:'+colors[i]+'">● '+x+'</span>').join(' ')+'</div>';
+  el.innerHTML='<div class="chart-toolbar"><button type="button" class="chart-zoom-in">＋ 확대</button><button type="button" class="chart-zoom-out">－ 축소</button><span class="chart-barnum">최근 '+hist.length+'봉</span></div><div class="candle-wrap"><svg viewBox="0 0 640 250" style="width:100%;height:250px" role="img" aria-label="가격 캔들 차트 및 EMA 5 10 20일">'+bars+paths.join('')+hits+'</svg><div class="candle-tooltip" hidden></div></div><div class="ema-legend"><span style="color:#d64b4b">■ 상승봉</span> <span style="color:#2784c5">■ 하락봉</span> '+['EMA5','EMA10','EMA20'].map((x,i)=>'<span style="color:'+colors[i]+'">● '+x+'</span>').join(' ')+'</div>';
+  const repaint=n=>{el.dataset.bars=String(Math.max(10,Math.min(120,n)));renderEma(code,date,targetId);};
+  el.querySelector('.chart-zoom-in').onclick=()=>repaint(count-10);
+  el.querySelector('.chart-zoom-out').onclick=()=>repaint(count+10);
+  const tip=el.querySelector('.candle-tooltip');
+  el.querySelectorAll('.candle-hit').forEach(hit=>{
+   hit.addEventListener('mouseenter',()=>{tip.hidden=false;tip.textContent=hit.dataset.day+' | 종가 '+hit.dataset.close+'원 | 거래량 '+hit.dataset.volume+'주 | 거래대금 '+hit.dataset.money+'억원';});
+   hit.addEventListener('mouseleave',()=>{tip.hidden=true;});
+  });
+
  }
 
  window.renderLVCandle=(code,date)=>renderEma(code,date,'lvEmaChart');
